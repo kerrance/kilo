@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Body Composition Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    color-scheme: light dark;
+    --bg:       light-dark(#f5f5f3, #0f0f0f);
+    --surface:  light-dark(#ffffff, #161616);
+    --surface2: light-dark(#ebebeb, #1e1e1e);
+    --border:   light-dark(#ddd, #2a2a2a);
+    --text:     light-dark(#111, #e8e8e8);
+    --muted:    light-dark(#888, #666);
+    --accent:   light-dark(#5a9e00, #c8f542);
+    --accent2:  light-dark(#0098b8, #42d4f4);
+    --accent3:  light-dark(#c47a00, #f4a342);
+    --danger:   light-dark(#d42020, #f44);
+    --good:     light-dark(#1a8a1a, #4f4);
+    --td-border: light-dark(#ebebeb, #1a1a1a);
+    --td-color:  light-dark(#444, #ccc);
+    --active-btn-text: light-dark(#fff, #0f0f0f);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h1 {
+    font-size: 1.1rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .latest-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  /* File loader */
+  .loader-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .loader-bar label {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    white-space: nowrap;
+  }
+
+  .loader-bar input[type="file"] { display: none; }
+
+  #file-status { font-family: 'DM Mono', monospace; font-size: 0.78rem; }
+
+  /* Summary row */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.25rem 1rem;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .stat-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-delta {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    margin-top: 0.35rem;
+  }
+
+  .delta-good { color: var(--good); }
+  .delta-bad { color: var(--danger); }
+  .delta-neutral { color: var(--muted); }
+
+  /* Range selector */
+  .controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .range-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 2px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+
+  .range-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .range-btn.active { background: var(--accent); border-color: var(--accent); color: var(--active-btn-text); }
+
+  /* Charts */
+  .charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .chart-wide { grid-column: 1 / -1; }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.25rem;
+  }
+
+  .chart-title {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 220px;
+  }
+
+  .chart-wide .chart-wrap { height: 260px; }
+
+  /* Table */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.25rem;
+    margin-top: 1rem;
+    overflow-x: auto;
+  }
+
+  .table-title {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+  }
+
+  th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 400;
+    padding: 0.4rem 0.75rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+  }
+
+  td {
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--td-border);
+    white-space: nowrap;
+    color: var(--td-color);
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  td.highlight { color: var(--text); }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    body { padding: 1rem; }
+    .charts { grid-template-columns: 1fr; }
+    .chart-wide { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Body Composition</h1>
+  <div style="display:flex;align-items:center;gap:1.25rem">
+    <span class="latest-date" id="latest-date">—</span>
+    <button id="theme-toggle" title="Toggle light/dark mode" style="
+      background:var(--surface);border:1px solid var(--border);color:var(--muted);
+      font-family:'DM Mono',monospace;font-size:0.75rem;padding:0.35rem 0.75rem;
+      border-radius:2px;cursor:pointer;letter-spacing:0.05em;transition:all 0.15s;
+    ">☀ light</button>
+  </div>
+</header>
+
+<div class="loader-bar">
+  <label for="xls-upload">⬆ Load updated file</label>
+  <input type="file" id="xls-upload" accept=".xls,.xlsx">
+  <span id="file-status">Drop a new export here to refresh data</span>
+</div>
+
+<div class="summary" id="summary"></div>
+
+<div class="controls" id="range-controls">
+  <button class="range-btn" data-days="30">30d</button>
+  <button class="range-btn" data-days="90">90d</button>
+  <button class="range-btn" data-days="180">6m</button>
+  <button class="range-btn" data-days="365">1y</button>
+  <button class="range-btn active" data-days="0">All</button>
+</div>
+
+<div class="charts">
+  <div class="chart-card chart-wide">
+    <div class="chart-title">Weight (kg)</div>
+    <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Body Fat %</div>
+    <div class="chart-wrap"><canvas id="fatChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Muscle Mass (kg)</div>
+    <div class="chart-wrap"><canvas id="muscleChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Body Water %</div>
+    <div class="chart-wrap"><canvas id="waterChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Visceral Fat Score</div>
+    <div class="chart-wrap"><canvas id="visceralChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">BMI</div>
+    <div class="chart-wrap"><canvas id="bmiChart"></canvas></div>
+  </div>
+</div>
+
+<div class="table-card">
+  <div class="table-title">Recent Readings</div>
+  <table id="readings-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Weight</th>
+        <th>BMI</th>
+        <th>Body Fat</th>
+        <th>Muscle Mass</th>
+        <th>Body Water</th>
+        <th>Visceral Fat</th>
+        <th>BMR</th>
+        <th>Body Age</th>
+      </tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+  </table>
+</div>
+
+<script>
+// ── Demo data — replace with your own export via the loader above ──
+// This is fictional sample data showing a typical weight-loss journey.
+const EMBEDDED_RAW = [
+  {"time":"2023-01-09 07:12:00","Weight":"95.4kg","BMI":"31.8","Body fat":"34.2%","Muscle mass":"58.2kg","Body water":"47.1%","Visceral fat":"16.0","Bone mass":"3.1kg","BMR":"1780","Protein":"14.8%","Subcutaneous fat":"29.0%","Lean body mass":"62.8kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"38","Skeletal Muscle":"40.2%","Muscle ratio":"61.0%"},
+  {"time":"2023-01-16 07:05:00","Weight":"94.8kg","BMI":"31.6","Body fat":"33.8%","Muscle mass":"58.3kg","Body water":"47.4%","Visceral fat":"16.0","Bone mass":"3.1kg","BMR":"1778","Protein":"14.9%","Subcutaneous fat":"28.7%","Lean body mass":"62.7kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"38","Skeletal Muscle":"40.4%","Muscle ratio":"61.5%"},
+  {"time":"2023-01-23 07:20:00","Weight":"95.1kg","BMI":"31.7","Body fat":"34.0%","Muscle mass":"58.2kg","Body water":"47.2%","Visceral fat":"16.0","Bone mass":"3.1kg","BMR":"1779","Protein":"14.8%","Subcutaneous fat":"28.9%","Lean body mass":"62.7kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"38","Skeletal Muscle":"40.3%","Muscle ratio":"61.2%"},
+  {"time":"2023-02-01 07:08:00","Weight":"94.3kg","BMI":"31.4","Body fat":"33.5%","Muscle mass":"58.4kg","Body water":"47.6%","Visceral fat":"15.0","Bone mass":"3.1kg","BMR":"1776","Protein":"15.0%","Subcutaneous fat":"28.4%","Lean body mass":"62.7kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"37","Skeletal Muscle":"40.6%","Muscle ratio":"61.9%"},
+  {"time":"2023-02-08 07:15:00","Weight":"93.8kg","BMI":"31.3","Body fat":"33.2%","Muscle mass":"58.5kg","Body water":"47.8%","Visceral fat":"15.0","Bone mass":"3.1kg","BMR":"1774","Protein":"15.1%","Subcutaneous fat":"28.1%","Lean body mass":"62.6kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"37","Skeletal Muscle":"40.8%","Muscle ratio":"62.4%"},
+  {"time":"2023-02-15 07:02:00","Weight":"93.2kg","BMI":"31.1","Body fat":"32.8%","Muscle mass":"58.5kg","Body water":"48.0%","Visceral fat":"15.0","Bone mass":"3.1kg","BMR":"1772","Protein":"15.2%","Subcutaneous fat":"27.8%","Lean body mass":"62.6kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"37","Skeletal Muscle":"41.0%","Muscle ratio":"62.8%"},
+  {"time":"2023-03-01 07:10:00","Weight":"92.7kg","BMI":"30.9","Body fat":"32.5%","Muscle mass":"58.6kg","Body water":"48.2%","Visceral fat":"15.0","Bone mass":"3.1kg","BMR":"1770","Protein":"15.3%","Subcutaneous fat":"27.5%","Lean body mass":"62.5kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"37","Skeletal Muscle":"41.2%","Muscle ratio":"63.2%"},
+  {"time":"2023-03-15 07:18:00","Weight":"92.0kg","BMI":"30.7","Body fat":"32.1%","Muscle mass":"58.6kg","Body water":"48.4%","Visceral fat":"15.0","Bone mass":"3.1kg","BMR":"1768","Protein":"15.4%","Subcutaneous fat":"27.2%","Lean body mass":"62.5kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"36","Skeletal Muscle":"41.4%","Muscle ratio":"63.7%"},
+  {"time":"2023-04-01 07:06:00","Weight":"91.4kg","BMI":"30.5","Body fat":"31.8%","Muscle mass":"58.7kg","Body water":"48.6%","Visceral fat":"14.0","Bone mass":"3.1kg","BMR":"1765","Protein":"15.5%","Subcutaneous fat":"26.9%","Lean body mass":"62.4kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"36","Skeletal Muscle":"41.6%","Muscle ratio":"64.2%"},
+  {"time":"2023-04-12 07:22:00","Weight":"91.9kg","BMI":"30.6","Body fat":"32.0%","Muscle mass":"58.6kg","Body water":"48.5%","Visceral fat":"14.0","Bone mass":"3.1kg","BMR":"1766","Protein":"15.4%","Subcutaneous fat":"27.1%","Lean body mass":"62.4kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"36","Skeletal Muscle":"41.5%","Muscle ratio":"63.8%"},
+  {"time":"2023-05-01 07:14:00","Weight":"90.8kg","BMI":"30.3","Body fat":"31.4%","Muscle mass":"58.7kg","Body water":"48.9%","Visceral fat":"14.0","Bone mass":"3.1kg","BMR":"1762","Protein":"15.6%","Subcutaneous fat":"26.6%","Lean body mass":"62.3kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"36","Skeletal Muscle":"41.8%","Muscle ratio":"64.7%"},
+  {"time":"2023-05-15 07:03:00","Weight":"90.3kg","BMI":"30.1","Body fat":"31.1%","Muscle mass":"58.8kg","Body water":"49.1%","Visceral fat":"14.0","Bone mass":"3.1kg","BMR":"1760","Protein":"15.7%","Subcutaneous fat":"26.3%","Lean body mass":"62.3kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"35","Skeletal Muscle":"42.0%","Muscle ratio":"65.1%"},
+  {"time":"2023-06-01 07:11:00","Weight":"91.2kg","BMI":"30.4","Body fat":"31.6%","Muscle mass":"58.7kg","Body water":"48.8%","Visceral fat":"14.0","Bone mass":"3.1kg","BMR":"1763","Protein":"15.5%","Subcutaneous fat":"26.8%","Lean body mass":"62.4kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"36","Skeletal Muscle":"41.7%","Muscle ratio":"64.4%"},
+  {"time":"2023-06-19 07:08:00","Weight":"90.7kg","BMI":"30.2","Body fat":"31.2%","Muscle mass":"58.8kg","Body water":"49.0%","Visceral fat":"14.0","Bone mass":"3.1kg","BMR":"1761","Protein":"15.6%","Subcutaneous fat":"26.5%","Lean body mass":"62.3kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"35","Skeletal Muscle":"41.9%","Muscle ratio":"64.8%"},
+  {"time":"2023-07-03 07:25:00","Weight":"89.9kg","BMI":"30.0","Body fat":"30.8%","Muscle mass":"58.8kg","Body water":"49.3%","Visceral fat":"13.0","Bone mass":"3.1kg","BMR":"1758","Protein":"15.8%","Subcutaneous fat":"26.1%","Lean body mass":"62.2kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"35","Skeletal Muscle":"42.2%","Muscle ratio":"65.4%"},
+  {"time":"2023-07-17 07:04:00","Weight":"90.4kg","BMI":"30.1","Body fat":"31.0%","Muscle mass":"58.8kg","Body water":"49.2%","Visceral fat":"13.0","Bone mass":"3.1kg","BMR":"1759","Protein":"15.7%","Subcutaneous fat":"26.3%","Lean body mass":"62.3kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"35","Skeletal Muscle":"42.0%","Muscle ratio":"65.1%"},
+  {"time":"2023-08-07 07:19:00","Weight":"89.3kg","BMI":"29.8","Body fat":"30.5%","Muscle mass":"58.9kg","Body water":"49.5%","Visceral fat":"13.0","Bone mass":"3.1kg","BMR":"1755","Protein":"15.9%","Subcutaneous fat":"25.8%","Lean body mass":"62.1kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"35","Skeletal Muscle":"42.4%","Muscle ratio":"65.9%"},
+  {"time":"2023-08-21 07:07:00","Weight":"89.8kg","BMI":"29.9","Body fat":"30.7%","Muscle mass":"58.8kg","Body water":"49.4%","Visceral fat":"13.0","Bone mass":"3.1kg","BMR":"1756","Protein":"15.8%","Subcutaneous fat":"26.0%","Lean body mass":"62.2kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"35","Skeletal Muscle":"42.2%","Muscle ratio":"65.5%"},
+  {"time":"2023-09-04 07:12:00","Weight":"88.6kg","BMI":"29.5","Body fat":"30.1%","Muscle mass":"58.9kg","Body water":"49.8%","Visceral fat":"13.0","Bone mass":"3.1kg","BMR":"1752","Protein":"16.0%","Subcutaneous fat":"25.5%","Lean body mass":"61.9kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"42.6%","Muscle ratio":"66.5%"},
+  {"time":"2023-09-18 07:01:00","Weight":"88.2kg","BMI":"29.4","Body fat":"29.8%","Muscle mass":"59.0kg","Body water":"50.0%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1750","Protein":"16.1%","Subcutaneous fat":"25.2%","Lean body mass":"61.9kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"42.8%","Muscle ratio":"66.9%"},
+  {"time":"2023-10-02 07:16:00","Weight":"87.9kg","BMI":"29.3","Body fat":"29.6%","Muscle mass":"59.0kg","Body water":"50.1%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1749","Protein":"16.2%","Subcutaneous fat":"25.0%","Lean body mass":"61.8kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"43.0%","Muscle ratio":"67.1%"},
+  {"time":"2023-10-16 07:09:00","Weight":"88.5kg","BMI":"29.5","Body fat":"29.9%","Muscle mass":"58.9kg","Body water":"49.9%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1751","Protein":"16.0%","Subcutaneous fat":"25.3%","Lean body mass":"62.0kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"42.7%","Muscle ratio":"66.6%"},
+  {"time":"2023-11-06 07:22:00","Weight":"87.4kg","BMI":"29.1","Body fat":"29.3%","Muscle mass":"59.1kg","Body water":"50.3%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1747","Protein":"16.3%","Subcutaneous fat":"24.8%","Lean body mass":"61.8kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"43.2%","Muscle ratio":"67.6%"},
+  {"time":"2023-11-20 07:05:00","Weight":"87.1kg","BMI":"29.0","Body fat":"29.1%","Muscle mass":"59.1kg","Body water":"50.4%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1745","Protein":"16.3%","Subcutaneous fat":"24.6%","Lean body mass":"61.7kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"33","Skeletal Muscle":"43.3%","Muscle ratio":"67.8%"},
+  {"time":"2023-12-04 07:14:00","Weight":"88.0kg","BMI":"29.3","Body fat":"29.7%","Muscle mass":"58.9kg","Body water":"50.0%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1748","Protein":"16.1%","Subcutaneous fat":"25.1%","Lean body mass":"61.9kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"42.8%","Muscle ratio":"66.9%"},
+  {"time":"2024-01-07 07:08:00","Weight":"89.6kg","BMI":"29.9","Body fat":"30.5%","Muscle mass":"58.7kg","Body water":"49.5%","Visceral fat":"13.0","Bone mass":"3.1kg","BMR":"1754","Protein":"15.8%","Subcutaneous fat":"25.8%","Lean body mass":"62.2kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"35","Skeletal Muscle":"42.3%","Muscle ratio":"65.5%"},
+  {"time":"2024-01-22 07:17:00","Weight":"88.9kg","BMI":"29.6","Body fat":"30.1%","Muscle mass":"58.8kg","Body water":"49.7%","Visceral fat":"13.0","Bone mass":"3.1kg","BMR":"1751","Protein":"16.0%","Subcutaneous fat":"25.5%","Lean body mass":"62.1kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"42.5%","Muscle ratio":"66.1%"},
+  {"time":"2024-02-05 07:03:00","Weight":"88.2kg","BMI":"29.4","Body fat":"29.8%","Muscle mass":"58.9kg","Body water":"49.9%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1749","Protein":"16.1%","Subcutaneous fat":"25.2%","Lean body mass":"62.0kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"42.7%","Muscle ratio":"66.7%"},
+  {"time":"2024-02-19 07:11:00","Weight":"87.6kg","BMI":"29.2","Body fat":"29.5%","Muscle mass":"59.0kg","Body water":"50.1%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1747","Protein":"16.2%","Subcutaneous fat":"24.9%","Lean body mass":"61.9kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"34","Skeletal Muscle":"43.0%","Muscle ratio":"67.4%"},
+  {"time":"2024-03-04 07:06:00","Weight":"87.1kg","BMI":"29.0","Body fat":"29.2%","Muscle mass":"59.0kg","Body water":"50.3%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1745","Protein":"16.3%","Subcutaneous fat":"24.7%","Lean body mass":"61.8kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"33","Skeletal Muscle":"43.1%","Muscle ratio":"67.7%"},
+  {"time":"2024-03-18 07:19:00","Weight":"86.5kg","BMI":"28.8","Body fat":"28.9%","Muscle mass":"59.1kg","Body water":"50.5%","Visceral fat":"12.0","Bone mass":"3.1kg","BMR":"1743","Protein":"16.4%","Subcutaneous fat":"24.4%","Lean body mass":"61.7kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"33","Skeletal Muscle":"43.3%","Muscle ratio":"68.3%"},
+  {"time":"2024-04-01 07:10:00","Weight":"86.0kg","BMI":"28.7","Body fat":"28.6%","Muscle mass":"59.2kg","Body water":"50.7%","Visceral fat":"11.0","Bone mass":"3.1kg","BMR":"1741","Protein":"16.5%","Subcutaneous fat":"24.1%","Lean body mass":"61.6kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"33","Skeletal Muscle":"43.5%","Muscle ratio":"68.8%"},
+  {"time":"2024-04-15 07:04:00","Weight":"86.4kg","BMI":"28.8","Body fat":"28.8%","Muscle mass":"59.1kg","Body water":"50.6%","Visceral fat":"11.0","Bone mass":"3.1kg","BMR":"1742","Protein":"16.4%","Subcutaneous fat":"24.3%","Lean body mass":"61.6kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"33","Skeletal Muscle":"43.4%","Muscle ratio":"68.4%"},
+  {"time":"2024-05-06 07:22:00","Weight":"85.7kg","BMI":"28.6","Body fat":"28.4%","Muscle mass":"59.2kg","Body water":"50.9%","Visceral fat":"11.0","Bone mass":"3.1kg","BMR":"1739","Protein":"16.6%","Subcutaneous fat":"24.0%","Lean body mass":"61.5kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"33","Skeletal Muscle":"43.6%","Muscle ratio":"69.1%"},
+  {"time":"2024-05-20 07:09:00","Weight":"85.3kg","BMI":"28.4","Body fat":"28.2%","Muscle mass":"59.3kg","Body water":"51.0%","Visceral fat":"11.0","Bone mass":"3.1kg","BMR":"1738","Protein":"16.6%","Subcutaneous fat":"23.8%","Lean body mass":"61.4kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"32","Skeletal Muscle":"43.8%","Muscle ratio":"69.5%"},
+  {"time":"2024-06-03 07:13:00","Weight":"84.9kg","BMI":"28.3","Body fat":"27.9%","Muscle mass":"59.3kg","Body water":"51.2%","Visceral fat":"11.0","Bone mass":"3.1kg","BMR":"1736","Protein":"16.7%","Subcutaneous fat":"23.5%","Lean body mass":"61.4kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"32","Skeletal Muscle":"44.0%","Muscle ratio":"69.8%"},
+  {"time":"2024-06-17 07:06:00","Weight":"85.2kg","BMI":"28.4","Body fat":"28.1%","Muscle mass":"59.3kg","Body water":"51.1%","Visceral fat":"11.0","Bone mass":"3.1kg","BMR":"1737","Protein":"16.6%","Subcutaneous fat":"23.7%","Lean body mass":"61.4kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"32","Skeletal Muscle":"43.9%","Muscle ratio":"69.6%"},
+  {"time":"2024-07-01 07:20:00","Weight":"84.5kg","BMI":"28.2","Body fat":"27.7%","Muscle mass":"59.4kg","Body water":"51.3%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1734","Protein":"16.8%","Subcutaneous fat":"23.3%","Lean body mass":"61.3kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"32","Skeletal Muscle":"44.1%","Muscle ratio":"70.3%"},
+  {"time":"2024-07-15 07:02:00","Weight":"84.1kg","BMI":"28.0","Body fat":"27.5%","Muscle mass":"59.4kg","Body water":"51.5%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1733","Protein":"16.9%","Subcutaneous fat":"23.1%","Lean body mass":"61.2kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"32","Skeletal Muscle":"44.3%","Muscle ratio":"70.7%"},
+  {"time":"2024-08-05 07:17:00","Weight":"83.8kg","BMI":"27.9","Body fat":"27.3%","Muscle mass":"59.5kg","Body water":"51.6%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1731","Protein":"17.0%","Subcutaneous fat":"22.9%","Lean body mass":"61.1kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"31","Skeletal Muscle":"44.5%","Muscle ratio":"71.0%"},
+  {"time":"2024-08-19 07:08:00","Weight":"84.2kg","BMI":"28.1","Body fat":"27.6%","Muscle mass":"59.4kg","Body water":"51.4%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1732","Protein":"16.8%","Subcutaneous fat":"23.2%","Lean body mass":"61.2kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"32","Skeletal Muscle":"44.2%","Muscle ratio":"70.5%"},
+  {"time":"2024-09-09 07:11:00","Weight":"83.4kg","BMI":"27.8","Body fat":"27.1%","Muscle mass":"59.5kg","Body water":"51.8%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1729","Protein":"17.0%","Subcutaneous fat":"22.7%","Lean body mass":"61.0kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"31","Skeletal Muscle":"44.6%","Muscle ratio":"71.3%"},
+  {"time":"2024-09-23 07:05:00","Weight":"83.0kg","BMI":"27.7","Body fat":"26.9%","Muscle mass":"59.6kg","Body water":"51.9%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1728","Protein":"17.1%","Subcutaneous fat":"22.5%","Lean body mass":"60.9kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"31","Skeletal Muscle":"44.8%","Muscle ratio":"71.8%"},
+  {"time":"2024-10-07 07:18:00","Weight":"82.7kg","BMI":"27.6","Body fat":"26.7%","Muscle mass":"59.6kg","Body water":"52.1%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1726","Protein":"17.2%","Subcutaneous fat":"22.3%","Lean body mass":"60.8kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"31","Skeletal Muscle":"45.0%","Muscle ratio":"72.1%"},
+  {"time":"2024-10-21 07:03:00","Weight":"83.1kg","BMI":"27.7","Body fat":"26.8%","Muscle mass":"59.6kg","Body water":"52.0%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1727","Protein":"17.1%","Subcutaneous fat":"22.4%","Lean body mass":"60.9kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"31","Skeletal Muscle":"44.9%","Muscle ratio":"71.7%"},
+  {"time":"2024-11-04 07:14:00","Weight":"82.4kg","BMI":"27.5","Body fat":"26.5%","Muscle mass":"59.7kg","Body water":"52.2%","Visceral fat":"9.0","Bone mass":"3.1kg","BMR":"1725","Protein":"17.2%","Subcutaneous fat":"22.1%","Lean body mass":"60.8kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"30","Skeletal Muscle":"45.1%","Muscle ratio":"72.5%"},
+  {"time":"2024-11-18 07:09:00","Weight":"82.1kg","BMI":"27.4","Body fat":"26.3%","Muscle mass":"59.7kg","Body water":"52.4%","Visceral fat":"9.0","Bone mass":"3.1kg","BMR":"1723","Protein":"17.3%","Subcutaneous fat":"21.9%","Lean body mass":"60.7kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"30","Skeletal Muscle":"45.3%","Muscle ratio":"72.7%"},
+  {"time":"2024-12-02 07:21:00","Weight":"83.5kg","BMI":"27.8","Body fat":"27.2%","Muscle mass":"59.5kg","Body water":"51.7%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1730","Protein":"16.9%","Subcutaneous fat":"22.8%","Lean body mass":"61.0kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"31","Skeletal Muscle":"44.5%","Muscle ratio":"71.3%"},
+  {"time":"2025-01-06 07:07:00","Weight":"84.8kg","BMI":"28.3","Body fat":"28.0%","Muscle mass":"59.2kg","Body water":"51.1%","Visceral fat":"11.0","Bone mass":"3.1kg","BMR":"1735","Protein":"16.6%","Subcutaneous fat":"23.6%","Lean body mass":"61.3kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"32","Skeletal Muscle":"43.9%","Muscle ratio":"69.8%"},
+  {"time":"2025-01-20 07:12:00","Weight":"84.0kg","BMI":"28.0","Body fat":"27.6%","Muscle mass":"59.3kg","Body water":"51.4%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1732","Protein":"16.8%","Subcutaneous fat":"23.2%","Lean body mass":"61.2kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"32","Skeletal Muscle":"44.2%","Muscle ratio":"70.6%"},
+  {"time":"2025-02-03 07:04:00","Weight":"83.3kg","BMI":"27.8","Body fat":"27.2%","Muscle mass":"59.5kg","Body water":"51.7%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1729","Protein":"17.0%","Subcutaneous fat":"22.8%","Lean body mass":"61.0kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"31","Skeletal Muscle":"44.5%","Muscle ratio":"71.4%"},
+  {"time":"2025-02-17 07:16:00","Weight":"82.8kg","BMI":"27.6","Body fat":"26.9%","Muscle mass":"59.6kg","Body water":"51.9%","Visceral fat":"10.0","Bone mass":"3.1kg","BMR":"1727","Protein":"17.1%","Subcutaneous fat":"22.5%","Lean body mass":"60.9kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"31","Skeletal Muscle":"44.7%","Muscle ratio":"72.0%"},
+  {"time":"2025-03-03 07:08:00","Weight":"82.3kg","BMI":"27.4","Body fat":"26.6%","Muscle mass":"59.7kg","Body water":"52.1%","Visceral fat":"9.0","Bone mass":"3.1kg","BMR":"1725","Protein":"17.2%","Subcutaneous fat":"22.2%","Lean body mass":"60.8kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"30","Skeletal Muscle":"44.9%","Muscle ratio":"72.5%"},
+  {"time":"2025-03-17 07:13:00","Weight":"81.9kg","BMI":"27.3","Body fat":"26.4%","Muscle mass":"59.7kg","Body water":"52.3%","Visceral fat":"9.0","Bone mass":"3.1kg","BMR":"1723","Protein":"17.3%","Subcutaneous fat":"22.0%","Lean body mass":"60.7kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"30","Skeletal Muscle":"45.1%","Muscle ratio":"72.9%"},
+  {"time":"2025-04-01 07:06:00","Weight":"81.5kg","BMI":"27.2","Body fat":"26.1%","Muscle mass":"59.8kg","Body water":"52.5%","Visceral fat":"9.0","Bone mass":"3.1kg","BMR":"1721","Protein":"17.4%","Subcutaneous fat":"21.8%","Lean body mass":"60.6kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"30","Skeletal Muscle":"45.3%","Muscle ratio":"73.4%"},
+  {"time":"2025-04-14 07:19:00","Weight":"81.2kg","BMI":"27.1","Body fat":"25.9%","Muscle mass":"59.9kg","Body water":"52.6%","Visceral fat":"9.0","Bone mass":"3.1kg","BMR":"1719","Protein":"17.5%","Subcutaneous fat":"21.6%","Lean body mass":"60.5kg","Body Type":"Fat Muscle","Standard Weight":"58.0kg","Body age":"30","Skeletal Muscle":"45.5%","Muscle ratio":"73.8%"}
+];
+
+// ── Parse helpers ──
+const parseNum = s => s ? parseFloat(String(s).replace(/[^0-9.]/g, '')) : null;
+
+function parseRaw(raw) {
+  return raw
+    .filter(r => r.Weight && parseNum(r.Weight) > 0 && r['Body fat'] && parseNum(r['Body fat']) > 0)
+    .map(r => ({
+      date: new Date(r.time),
+      dateStr: r.time.slice(0,10),
+      weight: parseNum(r.Weight),
+      bmi: parseNum(r.BMI),
+      bodyFat: parseNum(r['Body fat']),
+      muscleMass: parseNum(r['Muscle mass']),
+      bodyWater: parseNum(r['Body water']),
+      visceralFat: parseNum(r['Visceral fat']),
+      boneMass: parseNum(r['Bone mass']),
+      bmr: parseNum(r.BMR),
+      protein: parseNum(r.Protein),
+      subFat: parseNum(r['Subcutaneous fat']),
+      leanMass: parseNum(r['Lean body mass']),
+      bodyAge: parseNum(r['Body age']),
+      skeletalMuscle: parseNum(r['Skeletal Muscle']),
+      muscleRatio: parseNum(r['Muscle ratio']),
+      bodyType: r['Body Type']
+    }))
+    .sort((a,b) => a.date - b.date);
+}
+
+// Deduplicate: keep one reading per date (morning one, i.e. first in sorted order)
+function dedupe(records) {
+  const seen = new Set();
+  return records.filter(r => {
+    if (seen.has(r.dateStr)) return false;
+    seen.add(r.dateStr);
+    return true;
+  });
+}
+
+// ── State ──
+let ALL_DATA = dedupe(parseRaw(EMBEDDED_RAW));
+let activeDays = 0;
+let charts = {};
+
+// ── XLS file loader ──
+document.getElementById('xls-upload').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('file-status').textContent = 'Reading…';
+
+  // Load SheetJS from CDN
+  if (!window.XLSX) {
+    await new Promise((res,rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  ALL_DATA = dedupe(parseRaw(json));
+  document.getElementById('file-status').textContent = `Loaded ${file.name} — ${ALL_DATA.length} readings`;
+  render();
+});
+
+// ── Filter by range ──
+function filtered() {
+  if (!activeDays) return ALL_DATA;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - activeDays);
+  return ALL_DATA.filter(r => r.date >= cutoff);
+}
+
+// ── Theme toggle ──
+const root = document.documentElement;
+let isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+function applyTheme() {
+  root.style.colorScheme = isDark ? 'dark' : 'light';
+  document.getElementById('theme-toggle').textContent = isDark ? '☀ light' : '☾ dark';
+  // Re-render charts so Chart.js picks up new computed colours
+  render();
+}
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  isDark = !isDark;
+  applyTheme();
+});
+
+// Respect system preference on load
+applyTheme();
+
+// ── Colour helpers (reads current CSS vars) ──
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// ── Chart defaults ──
+function getChartDefaults() {
+  const gridCol  = isDark ? '#1a1a1a' : '#e8e8e8';
+  const tickCol  = isDark ? '#555'    : '#aaa';
+  const borderCol = isDark ? '#2a2a2a' : '#ddd';
+  const tipBg    = isDark ? '#1e1e1e' : '#ffffff';
+  const tipBorder = isDark ? '#2a2a2a' : '#ddd';
+  const tipTitle  = isDark ? '#666'   : '#aaa';
+  const tipBody   = isDark ? '#e8e8e8': '#111';
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: tipBg,
+        borderColor: tipBorder,
+        borderWidth: 1,
+        titleColor: tipTitle,
+        bodyColor: tipBody,
+        padding: 10,
+        titleFont: { family: 'DM Mono', size: 11 },
+        bodyFont: { family: 'DM Mono', size: 12 }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: tickCol, font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+        grid: { color: gridCol },
+        border: { color: borderCol }
+      },
+      y: {
+        ticks: { color: tickCol, font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 6 },
+        grid: { color: gridCol },
+        border: { color: borderCol }
+      }
+    }
+  };
+}
+
+function lineDataset(data, color, fill = false) {
+  return {
+    data,
+    borderColor: color,
+    borderWidth: 2,
+    pointRadius: data.length > 60 ? 0 : 3,
+    pointHoverRadius: 5,
+    pointBackgroundColor: color,
+    tension: 0.3,
+    fill: fill ? { target: 'origin', above: color + '18' } : false
+  };
+}
+
+function makeChart(id, labels, datasets, yLabel = '') {
+  const ctx = document.getElementById(id).getContext('2d');
+  if (charts[id]) charts[id].destroy();
+  const opts = JSON.parse(JSON.stringify(getChartDefaults()));
+  if (yLabel) opts.scales.y.title = { display: true, text: yLabel, color: isDark ? '#444' : '#bbb', font: { family: 'DM Mono', size: 10 } };
+  charts[id] = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: opts });
+}
+
+// ── Render ──
+function render() {
+  const data = filtered();
+  if (!data.length) return;
+
+  const labels = data.map(r => r.dateStr);
+  const latest = data[data.length - 1];
+  const first = data[0];
+  const prev = data.length > 1 ? data[data.length - 2] : latest;
+
+  // Header date
+  document.getElementById('latest-date').textContent = `Latest: ${latest.dateStr}`;
+
+  // Summary stats
+  const delta = (cur, old, decimals = 1, invertGood = false) => {
+    const d = (cur - old).toFixed(decimals);
+    const sign = d > 0 ? '+' : '';
+    const good = invertGood ? d < 0 : d > 0;
+    const cls = Math.abs(d) < 0.05 ? 'delta-neutral' : (good ? 'delta-good' : 'delta-bad');
+    return `<span class="${cls}">${sign}${d} vs prev</span>`;
+  };
+
+  const totalDelta = (cur, old, decimals = 1, invertGood = false) => {
+    const d = (cur - old).toFixed(decimals);
+    const sign = d > 0 ? '+' : '';
+    const good = invertGood ? d < 0 : d > 0;
+    const cls = Math.abs(d) < 0.05 ? 'delta-neutral' : (good ? 'delta-good' : 'delta-bad');
+    return `<span class="${cls}">${sign}${d} overall</span>`;
+  };
+
+  const stats = [
+    { label: 'Weight', val: `${latest.weight} kg`, d1: delta(latest.weight, prev.weight, 1, true), d2: totalDelta(latest.weight, first.weight, 1, true) },
+    { label: 'Body Fat', val: `${latest.bodyFat}%`, d1: delta(latest.bodyFat, prev.bodyFat, 1, true), d2: totalDelta(latest.bodyFat, first.bodyFat, 1, true) },
+    { label: 'Muscle Mass', val: `${latest.muscleMass} kg`, d1: delta(latest.muscleMass, prev.muscleMass, 1), d2: totalDelta(latest.muscleMass, first.muscleMass, 1) },
+    { label: 'Body Water', val: `${latest.bodyWater}%`, d1: delta(latest.bodyWater, prev.bodyWater, 1), d2: totalDelta(latest.bodyWater, first.bodyWater, 1) },
+    { label: 'Visceral Fat', val: latest.visceralFat, d1: delta(latest.visceralFat, prev.visceralFat, 0, true), d2: totalDelta(latest.visceralFat, first.visceralFat, 0, true) },
+    { label: 'BMI', val: latest.bmi, d1: delta(latest.bmi, prev.bmi, 1, true), d2: totalDelta(latest.bmi, first.bmi, 1, true) },
+    { label: 'BMR', val: `${latest.bmr} kcal`, d1: '', d2: '' },
+    { label: 'Body Age', val: latest.bodyAge, d1: '', d2: '' },
+  ];
+
+  document.getElementById('summary').innerHTML = stats.map(s => `
+    <div class="stat">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value">${s.val}</div>
+      <div class="stat-delta">${s.d1}</div>
+      <div class="stat-delta">${s.d2}</div>
+    </div>
+  `).join('');
+
+  // Charts
+  makeChart('weightChart', labels, [lineDataset(data.map(r=>r.weight), '#c8f542', true)]);
+  makeChart('fatChart', labels, [lineDataset(data.map(r=>r.bodyFat), '#f44', false)]);
+  makeChart('muscleChart', labels, [lineDataset(data.map(r=>r.muscleMass), '#42d4f4', false)]);
+  makeChart('waterChart', labels, [lineDataset(data.map(r=>r.bodyWater), '#4da6ff', false)]);
+  makeChart('visceralChart', labels, [lineDataset(data.map(r=>r.visceralFat), '#f4a342', false)]);
+  makeChart('bmiChart', labels, [lineDataset(data.map(r=>r.bmi), '#a342f4', false)]);
+
+  // Table (most recent 20)
+  const recent = [...data].reverse().slice(0, 20);
+  document.getElementById('table-body').innerHTML = recent.map(r => `
+    <tr>
+      <td class="highlight">${r.dateStr}</td>
+      <td class="highlight">${r.weight} kg</td>
+      <td>${r.bmi}</td>
+      <td>${r.bodyFat}%</td>
+      <td>${r.muscleMass} kg</td>
+      <td>${r.bodyWater}%</td>
+      <td>${r.visceralFat}</td>
+      <td>${r.bmr}</td>
+      <td>${r.bodyAge}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Range buttons ──
+document.querySelectorAll('.range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeDays = parseInt(btn.dataset.days);
+    render();
+  });
+});
+</script>
+</body>
+</html>
