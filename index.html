@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Body Composition Dashboard</title>
+<title>Kilo — Body Composition Dashboard</title>
+<meta name="description" content="Kilo: track your body composition over time using data exported from your smart scale app.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -47,11 +48,21 @@
   }
 
   h1 {
-    font-size: 1.1rem;
-    font-weight: 400;
+    font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .brand-sub {
+    font-size: 0.68rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--muted);
+    margin-top: 0.3rem;
+    font-weight: 300;
   }
 
   .latest-date {
@@ -230,18 +241,57 @@
 
   td.highlight { color: var(--text); }
 
+  /* Footer */
+  footer {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  footer a {
+    color: var(--muted);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color 0.15s;
+  }
+
+  footer a:hover { color: var(--accent); }
+
+  .footer-sources { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+  .footer-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
   /* Responsive */
   @media (max-width: 700px) {
     body { padding: 1rem; }
     .charts { grid-template-columns: 1fr; }
     .chart-wide { grid-column: 1; }
+    footer { flex-direction: column; align-items: flex-start; }
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>Body Composition</h1>
+  <div>
+    <h1>Kilo</h1>
+    <p class="brand-sub">Body Composition Dashboard</p>
+  </div>
   <div style="display:flex;align-items:center;gap:1.25rem">
     <span class="latest-date" id="latest-date">—</span>
     <button id="theme-toggle" title="Toggle light/dark mode" style="
@@ -253,9 +303,9 @@
 </header>
 
 <div class="loader-bar">
-  <label for="xls-upload">⬆ Load updated file</label>
+  <label for="xls-upload">⬆ Load file</label>
   <input type="file" id="xls-upload" accept=".xls,.xlsx">
-  <span id="file-status">Drop a new export here to refresh data</span>
+  <span id="file-status">Load an XLS export from the INSMART Health app (<a href="https://apps.apple.com/gb/app/insmart-health/id1633412395" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;text-underline-offset:3px;">iOS</a> / <a href="https://play.google.com/store/apps/details?id=com.lefu.insmart&hl=en_GB" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;text-underline-offset:3px;">Android</a>) to get started</span>
 </div>
 
 <div class="summary" id="summary"></div>
@@ -314,6 +364,20 @@
     <tbody id="table-body"></tbody>
   </table>
 </div>
+
+<footer>
+  <div class="footer-sources">
+    <span style="letter-spacing:0.05em">Supported sources:</span>
+    <span class="footer-badge">
+      INSMART Health
+      (<a href="https://apps.apple.com/gb/app/insmart-health/id1633412395" target="_blank" rel="noopener">iOS</a>
+      / <a href="https://play.google.com/store/apps/details?id=com.lefu.insmart&hl=en_GB" target="_blank" rel="noopener">Android</a>)
+    </span>
+    <span style="color:var(--border)">·</span>
+    <span style="font-size:0.7rem">Want another app added? <a href="mailto:kilo@razorsharp.digital">kilo@razorsharp.digital</a></span>
+  </div>
+  <span>Made by <a href="https://www.razorsharp.digital/" target="_blank" rel="noopener">Razor Sharp</a></span>
+</footer>
 
 <script>
 // ── Demo data — replace with your own export via the loader above ──
